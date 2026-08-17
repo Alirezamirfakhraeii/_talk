@@ -1,0 +1,85 @@
+package app
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/ALirezamirfakhraeii/samatalk/backend/internal/config"
+	"github.com/ALirezamirfakhraeii/samatalk/backend/internal/health"
+	"github.com/ALirezamirfakhraeii/samatalk/backend/internal/platform/database"
+	"github.com/ALirezamirfakhraeii/samatalk/backend/internal/platform/httpserver"
+
+	"github.com/ALirezamirfakhraeii/samatalk/backend/internal/user"
+)
+
+type App struct {
+	server   *httpserver.Server
+	database *pgxpool.Pool
+}
+
+func New(
+	ctx context.Context,
+	cfg config.Config,
+) (*App, error) {
+	databasePool, err := database.NewPostgres(
+		ctx,
+		cfg.DatabaseURL,
+	)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"initialize database: %w",
+			err,
+		)
+	}
+
+	mux := http.NewServeMux()
+
+	healthHandler := health.NewHandler(
+		databasePool,
+	)
+
+	health.RegisterRoutes(
+		mux,
+		healthHandler,
+	)
+
+	userRepository := user.NewRepository(
+		databasePool,
+	)
+
+	userService := user.NewService(
+		userRepository,
+	)
+
+	userHandler := user.NewHandler(
+		userService,
+	)
+
+	user.RegisterRoutes(
+		mux,
+		userHandler,
+	)
+
+	server := httpserver.New(
+		cfg.HTTPAddress,
+		mux,
+	)
+
+	return &App{
+		server:   server,
+		database: databasePool,
+	}, nil
+}
+
+func (app *App) Run(ctx context.Context) error {
+	return app.server.Run(ctx)
+}
+
+func (app *App) Close() {
+	if app.database != nil {
+		app.database.Close()
+	}
+}

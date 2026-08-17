@@ -1,0 +1,25 @@
+services:
+  postgres:
+    image: postgres:18.4-alpine
+
+    container_name: samatalk-postgres
+
+    environment:
+      POSTGRES_DB: samatalk
+      POSTGRES_USER: samatalk
+      POSTGRES_PASSWORD: samatalk_dev_password
+
+    ports:
+      - "5433:5432"
+
+    volumes:
+      - samatalk_postgres_data:/var/lib/postgresql
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U samatalk -d samatalk"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  samatalk_postgres_data:
