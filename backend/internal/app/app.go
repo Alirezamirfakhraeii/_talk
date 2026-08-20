@@ -11,8 +11,9 @@ import (
 	"github.com/ALirezamirfakhraeii/samatalk/backend/internal/health"
 	"github.com/ALirezamirfakhraeii/samatalk/backend/internal/platform/database"
 	"github.com/ALirezamirfakhraeii/samatalk/backend/internal/platform/httpserver"
-
 	"github.com/ALirezamirfakhraeii/samatalk/backend/internal/user"
+
+	"github.com/ALirezamirfakhraeii/samatalk/backend/internal/auth"
 )
 
 type App struct {
@@ -50,8 +51,13 @@ func New(
 		databasePool,
 	)
 
+	authRepository := auth.NewRepository(
+		databasePool,
+	)
+
 	userService := user.NewService(
 		userRepository,
+		authRepository,
 	)
 
 	userHandler := user.NewHandler(
