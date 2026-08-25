@@ -1,25 +1,25 @@
 import {useState} from 'react'
+import type {FormEvent} from 'react'
+import {useNavigate} from 'react-router-dom'
 
 import {
     register,
     type RegisterResponseData,
 } from './registerApi'
 
-import './RegisterForm.css'
+import '../../../shared/styles/AuthForm.css'
 
 function RegisterForm() {
+    const navigate = useNavigate()
+
     const [name, setName] = useState('')
     const [username, setUsername] = useState('')
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
 
     const [isLoading, setIsLoading] = useState(false)
-
-    const [successMessage, setSuccessMessage] =
-        useState('')
-
-    const [errorMessage, setErrorMessage] =
-        useState('')
+    const [successMessage, setSuccessMessage] = useState('')
+    const [errorMessage, setErrorMessage] = useState('')
 
     const [fieldErrors, setFieldErrors] = useState<
         Record<string, string>
@@ -28,9 +28,7 @@ function RegisterForm() {
     const [registeredUser, setRegisteredUser] =
         useState<RegisterResponseData | null>(null)
 
-    async function handleSubmit(
-        event: React.FormEvent<HTMLFormElement>,
-    ) {
+    async function handleSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault()
 
         setIsLoading(true)
@@ -52,36 +50,25 @@ function RegisterForm() {
                     ...(response.error.fields ?? {}),
                 }
 
-                if (
-                    response.error.code ===
-                    'EMAIL_ALREADY_EXISTS'
-                ) {
-                    errors.email =
-                        'This email is already in use.'
+                if (response.error.code === 'EMAIL_ALREADY_EXISTS') {
+                    errors.email = 'This email is already in use.'
                 }
 
-                if (
-                    response.error.code ===
-                    'USERNAME_ALREADY_EXISTS'
-                ) {
-                    errors.username =
-                        'This username is already in use.'
+                if (response.error.code === 'USERNAME_ALREADY_EXISTS') {
+                    errors.username = 'This username is already in use.'
                 }
 
                 setFieldErrors(errors)
 
                 if (Object.keys(errors).length === 0) {
-                    setErrorMessage(
-                        response.error.message,
-                    )
+                    setErrorMessage(response.error.message)
                 }
 
                 return
             }
 
             setSuccessMessage(
-                response.message ??
-                'Account created successfully',
+                response.message ?? 'Account created successfully',
             )
 
             setRegisteredUser(response.data)
@@ -91,140 +78,127 @@ function RegisterForm() {
             setEmail('')
             setPassword('')
         } catch {
-            setErrorMessage(
-                'Could not connect to the server.',
-            )
+            setErrorMessage('Could not connect to the server.')
         } finally {
             setIsLoading(false)
         }
     }
 
     return (
-        <form
-            className="register-form"
-            onSubmit={handleSubmit}
-        >
+        <form className="auth-form" onSubmit={handleSubmit}>
             {successMessage && (
-                <div className="register-alert register-alert-success">
+                <div className="auth-alert auth-alert-success">
                     {successMessage}
                 </div>
             )}
 
             {errorMessage && (
-                <div className="register-alert register-alert-error">
+                <div className="auth-alert auth-alert-error">
                     {errorMessage}
                 </div>
             )}
 
-            <div className="register-field">
-                <label htmlFor="name">
-                    Full name
-                </label>
+            <div className="auth-field">
+                <label htmlFor="name">Full name</label>
 
                 <input
                     id="name"
                     type="text"
                     placeholder="Ali Reza"
                     value={name}
-                    onChange={(event) =>
-                        setName(event.target.value)
-                    }
+                    onChange={(event) => setName(event.target.value)}
                 />
 
                 {fieldErrors.name && (
-                    <span className="register-field-error">
+                    <span className="auth-field-error">
             {fieldErrors.name}
           </span>
                 )}
             </div>
 
-            <div className="register-field">
-                <label htmlFor="username">
-                    Username
-                </label>
+            <div className="auth-field">
+                <label htmlFor="username">Username</label>
 
                 <input
                     id="username"
                     type="text"
                     placeholder="alirezamir"
                     value={username}
-                    onChange={(event) =>
-                        setUsername(event.target.value)
-                    }
+                    onChange={(event) => setUsername(event.target.value)}
                 />
 
                 {fieldErrors.username && (
-                    <span className="register-field-error">
+                    <span className="auth-field-error">
             {fieldErrors.username}
           </span>
                 )}
             </div>
 
-            <div className="register-field">
-                <label htmlFor="email">
-                    Email address
-                </label>
+            <div className="auth-field">
+                <label htmlFor="email">Email address</label>
 
                 <input
                     id="email"
                     type="email"
                     placeholder="name@example.com"
                     value={email}
-                    onChange={(event) =>
-                        setEmail(event.target.value)
-                    }
+                    onChange={(event) => setEmail(event.target.value)}
                 />
 
                 {fieldErrors.email && (
-                    <span className="register-field-error">
+                    <span className="auth-field-error">
             {fieldErrors.email}
           </span>
                 )}
             </div>
 
-            <div className="register-field">
-                <label htmlFor="password">
-                    Password
-                </label>
+            <div className="auth-field">
+                <label htmlFor="password">Password</label>
 
                 <input
                     id="password"
                     type="password"
                     placeholder="Minimum 8 characters"
                     value={password}
-                    onChange={(event) =>
-                        setPassword(event.target.value)
-                    }
+                    onChange={(event) => setPassword(event.target.value)}
                 />
 
                 {fieldErrors.password ? (
-                    <span className="register-field-error">
+                    <span className="auth-field-error">
             {fieldErrors.password}
           </span>
                 ) : (
-                    <span className="register-field-help">
+                    <span className="auth-field-help">
             Use at least 8 characters.
           </span>
                 )}
             </div>
 
             <button
-                className="register-submit"
+                className="auth-submit"
                 type="submit"
                 disabled={isLoading}
             >
-                {isLoading
-                    ? 'Creating account...'
-                    : 'Create account'}
-
-                {!isLoading && <span>→</span>}
+                {isLoading ? 'Creating account...' : 'Create account'}
             </button>
 
             {registeredUser && (
-                <div className="register-created-user">
+                <div className="auth-alert auth-alert-success">
                     Welcome, {registeredUser.name}
                 </div>
             )}
+
+            <div className="auth-footer">
+                <span>Already have an account?</span>
+
+                <button
+                    className="auth-link"
+                    type="button"
+                    onClick={() => navigate('/login')}
+                >
+                    Sign in
+                </button>
+            </div>
         </form>
     )
 }

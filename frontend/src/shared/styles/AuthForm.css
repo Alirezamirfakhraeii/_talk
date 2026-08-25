@@ -1,0 +1,124 @@
+.auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.auth-alert {
+    padding: 12px 14px;
+    border-radius: 10px;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.auth-alert-error {
+    color: #b42318;
+    background: #fff1f0;
+    border: 1px solid #ffd6d2;
+}
+
+.auth-alert-success {
+    color: #067647;
+    background: #ecfdf3;
+    border: 1px solid #abefc6;
+}
+
+.auth-field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.auth-field label {
+    color: #1f2937;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.auth-field input {
+    width: 100%;
+    height: 50px;
+    box-sizing: border-box;
+    padding: 0 14px;
+    color: #111827;
+    background: #ffffff;
+    border: 1px solid #d1d5db;
+    border-radius: 10px;
+    outline: none;
+    font-family: inherit;
+    font-size: 14px;
+    transition: border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.auth-field input::placeholder {
+    color: #9ca3af;
+}
+
+.auth-field input:focus {
+    border-color: #3157e3;
+    box-shadow: 0 0 0 3px rgba(49, 87, 227, 0.1);
+}
+
+.auth-field-error {
+    color: #d92d20;
+    font-size: 12px;
+}
+
+.auth-field-help {
+    color: #98a2b3;
+    font-size: 12px;
+}
+
+.auth-submit {
+    width: 100%;
+    height: 50px;
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: #ffffff;
+    background: #3157e3;
+    border: 0;
+    border-radius: 10px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    transition: background 0.2s ease,
+    transform 0.2s ease;
+}
+
+.auth-submit:hover:not(:disabled) {
+    background: #2848c7;
+}
+
+.auth-submit:active:not(:disabled) {
+    transform: scale(0.99);
+}
+
+.auth-submit:disabled {
+    cursor: not-allowed;
+    opacity: 0.65;
+}
+
+.auth-footer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    color: #6b7280;
+    font-size: 13px;
+}
+
+.auth-link {
+    padding: 0;
+    color: #3157e3;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+}
