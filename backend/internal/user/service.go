@@ -185,3 +185,26 @@ func (service *Service) CurrentUser(
 
 	return authenticatedUser, nil
 }
+
+func (service *Service) SearchUsers(
+	ctx context.Context,
+	currentUserID int64,
+	searchTerm string,
+) ([]User, error) {
+	searchTerm = strings.TrimSpace(searchTerm)
+
+	if len(searchTerm) < 2 {
+		return []User{}, nil
+	}
+
+	users, err := service.repository.Search(
+		ctx,
+		currentUserID,
+		searchTerm,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("search users: %w", err)
+	}
+
+	return users, nil
+}

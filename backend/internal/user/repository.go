@@ -120,3 +120,60 @@ func (repository *Repository) FindByEmail(
 
 	return foundUser, nil
 }
+
+func (repository *Repository) Search(
+	ctx context.Context,
+	currentUserID int64,
+	searchTerm string,
+) ([]User, error) {
+	query := `
+		SELECT
+			id,
+			name,
+			username
+		FROM users
+		WHERE id <> $1
+		  AND (
+			name ILIKE $2
+			OR username ILIKE $2
+		  )
+		ORDER BY username
+		LIMIT 20
+	`
+
+	searchPattern := "%" + searchTerm + "%"
+
+	rows, err := repository.database.Query(
+		ctx,
+		query,
+		currentUserID,
+		searchPattern,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("search users: %w", err)
+	}
+	defer rows.Close()
+
+	users := make([]User, 0)
+
+	for rows.Next() {
+		var foundUser User
+
+		err := rows.Scan(
+			&foundUser.ID,
+			&foundUser.Name,
+			&foundUser.Username,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("scan searched user: %w", err)
+		}
+
+		users = append(users, foundUser)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate searched users: %w", err)
+	}
+
+	return users, nil
+}

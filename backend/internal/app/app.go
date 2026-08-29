@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/ALirezamirfakhraeii/samatalk/backend/internal/config"
+	"github.com/ALirezamirfakhraeii/samatalk/backend/internal/conversation"
 	"github.com/ALirezamirfakhraeii/samatalk/backend/internal/health"
 	"github.com/ALirezamirfakhraeii/samatalk/backend/internal/platform/database"
 	"github.com/ALirezamirfakhraeii/samatalk/backend/internal/platform/httpserver"
@@ -55,18 +56,35 @@ func New(
 		databasePool,
 	)
 
+	authMiddleware := auth.NewMiddleware(authRepository)
+
 	userService := user.NewService(
 		userRepository,
 		authRepository,
 	)
 
-	userHandler := user.NewHandler(
-		userService,
+	userHandler := user.NewHandler(userService)
+
+	conversationRepository := conversation.NewRepository(databasePool)
+
+	conversationService := conversation.NewService(
+		conversationRepository,
+	)
+
+	conversationHandler := conversation.NewHandler(
+		conversationService,
+	)
+
+	conversation.RegisterRoutes(
+		mux,
+		conversationHandler,
+		authMiddleware,
 	)
 
 	user.RegisterRoutes(
 		mux,
 		userHandler,
+		authMiddleware,
 	)
 
 	server := httpserver.New(

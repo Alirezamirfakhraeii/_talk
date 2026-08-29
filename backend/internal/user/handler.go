@@ -48,6 +48,12 @@ type loginResponseData struct {
 	Email    string `json:"email"`
 }
 
+type searchUserResponseData struct {
+	ID       int64  `json:"id"`
+	Name     string `json:"name"`
+	Username string `json:"username"`
+}
+
 func NewHandler(
 	service *Service,
 ) *Handler {
@@ -248,11 +254,11 @@ func (handler *Handler) Me(
 	responseWriter http.ResponseWriter,
 	request *http.Request,
 ) {
-	cookie, err := request.Cookie(
-		"samatalk_session",
+	currentUser, ok := auth.CurrentUserFromContext(
+		request.Context(),
 	)
 
-	if err != nil {
+	if !ok {
 		httpresponse.Error(
 			responseWriter,
 			http.StatusUnauthorized,
@@ -260,39 +266,6 @@ func (handler *Handler) Me(
 			"authentication required",
 			nil,
 		)
-
-		return
-	}
-
-	currentUser, err := handler.service.CurrentUser(
-		request.Context(),
-		cookie.Value,
-	)
-
-	if err != nil {
-		if errors.Is(
-			err,
-			auth.ErrInvalidSession,
-		) {
-			httpresponse.Error(
-				responseWriter,
-				http.StatusUnauthorized,
-				"UNAUTHORIZED",
-				"invalid or expired session",
-				nil,
-			)
-
-			return
-		}
-
-		httpresponse.Error(
-			responseWriter,
-			http.StatusInternalServerError,
-			"INTERNAL_ERROR",
-			"internal server error",
-			nil,
-		)
-
 		return
 	}
 
@@ -306,5 +279,57 @@ func (handler *Handler) Me(
 			Username: currentUser.Username,
 			Email:    currentUser.Email,
 		},
+	)
+}
+
+func (handler *Handler) Search(
+	responseWriter http.ResponseWriter,
+	request *http.Request,
+) {
+	currentUser, ok := auth.CurrentUserFromContext(request.Context())
+	if !ok {
+		httpresponse.Error(
+			responseWriter,
+			http.StatusUnauthorized,
+			"UNAUTHORIZED",
+			"authentication required",
+			nil,
+		)
+		return
+	}
+
+	searchTerm := request.URL.Query().Get("q")
+
+	users, err := handler.service.SearchUsers(
+		request.Context(),
+		currentUser.ID,
+		searchTerm,
+	)
+	if err != nil {
+		httpresponse.Error(
+			responseWriter,
+			http.StatusInternalServerError,
+			"INTERNAL_ERROR",
+			"internal server error",
+			nil,
+		)
+		return
+	}
+
+	results := make([]searchUserResponseData, 0, len(users))
+
+	for _, foundUser := range users {
+		results = append(results, searchUserResponseData{
+			ID:       foundUser.ID,
+			Name:     foundUser.Name,
+			Username: foundUser.Username,
+		})
+	}
+
+	httpresponse.Success(
+		responseWriter,
+		http.StatusOK,
+		"users retrieved successfully",
+		results,
 	)
 }

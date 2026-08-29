@@ -2,15 +2,8 @@ import {BrowserRouter, Navigate, Route, Routes} from 'react-router-dom'
 
 import LoginPage from '../features/auth/login/LoginPage'
 import RegisterPage from '../features/auth/register/RegisterPage'
-
-function ChatsPage() {
-    return (
-        <main>
-            <h1>Chats</h1>
-            <p>Welcome to SamaTalk.</p>
-        </main>
-    )
-}
+import ProtectedRoute from '../features/auth/ProtectedRoute'
+import ChatsPage from '../features/chat/ChatsPage'
 
 function App() {
     return (
@@ -19,7 +12,7 @@ function App() {
                 <Route path="/" element={<Navigate to="/login" replace/>}/>
                 <Route path="/login" element={<LoginPage/>}/>
                 <Route path="/register" element={<RegisterPage/>}/>
-                <Route path="/chats" element={<ChatsPage/>}/>
+                <Route path="/chats" element={<ProtectedRoute><ChatsPage/></ProtectedRoute>}/>
             </Routes>
         </BrowserRouter>
     )
