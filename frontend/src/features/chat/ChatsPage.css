@@ -522,3 +522,53 @@
         width: 100%;
     }
 }
+
+
+.user-search {
+    position: relative;
+}
+
+.search-results {
+    margin: 0 9px 10px;
+    padding: 5px;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 12px;
+}
+
+.search-status {
+    padding: 14px;
+    color: #748095;
+    font-size: 12px;
+    text-align: center;
+}
+
+
+.messages-status {
+    margin: auto;
+    padding: 20px;
+    color: #8d95a5;
+    font-size: 13px;
+    text-align: center;
+}
+
+.messages-status-error {
+    color: #d14343;
+}
+
+.composer button:disabled,
+.composer input:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+
+.conversation-list-status {
+    padding: 24px 14px;
+    color: #748095;
+    font-size: 12px;
+    text-align: center;
+}
+
+.conversation-list-status.error {
+    color: #ef6b6b;
+}

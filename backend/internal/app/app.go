@@ -15,6 +15,7 @@ import (
 	"github.com/ALirezamirfakhraeii/samatalk/backend/internal/user"
 
 	"github.com/ALirezamirfakhraeii/samatalk/backend/internal/auth"
+	"github.com/ALirezamirfakhraeii/samatalk/backend/internal/message"
 )
 
 type App struct {
@@ -69,6 +70,7 @@ func New(
 
 	conversationService := conversation.NewService(
 		conversationRepository,
+		userRepository,
 	)
 
 	conversationHandler := conversation.NewHandler(
@@ -78,6 +80,21 @@ func New(
 	conversation.RegisterRoutes(
 		mux,
 		conversationHandler,
+		authMiddleware,
+	)
+
+	messageRepository := message.NewRepository(databasePool)
+
+	messageService := message.NewService(
+		messageRepository,
+		conversationRepository,
+	)
+
+	messageHandler := message.NewHandler(messageService)
+
+	message.RegisterRoutes(
+		mux,
+		messageHandler,
 		authMiddleware,
 	)
 

@@ -2,8 +2,11 @@ package conversation
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -62,4 +65,126 @@ func (repository *Repository) FindOrCreate(
 	}
 
 	return foundConversation, nil
+}
+
+func (repository *Repository) FindByIDForUser(
+	ctx context.Context,
+	conversationID int64,
+	userID int64,
+) (*DirectConversation, error) {
+	query := `
+		SELECT
+			id,
+			user_one_id,
+			user_two_id,
+			created_at,
+			updated_at
+		FROM direct_conversations
+		WHERE id = $1
+		  AND (user_one_id = $2 OR user_two_id = $2)
+	`
+
+	conversation := &DirectConversation{}
+
+	err := repository.database.QueryRow(
+		ctx,
+		query,
+		conversationID,
+		userID,
+	).Scan(
+		&conversation.ID,
+		&conversation.UserOneID,
+		&conversation.UserTwoID,
+		&conversation.CreatedAt,
+		&conversation.UpdatedAt,
+	)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrConversationNotFound
+		}
+
+		return nil, fmt.Errorf("find conversation for user: %w", err)
+	}
+
+	return conversation, nil
+}
+
+func (repository *Repository) ListForUser(
+	ctx context.Context,
+	userID int64,
+) ([]ConversationSummary, error) {
+	query := `
+		SELECT
+			dc.id,
+			other_user.id,
+			other_user.name,
+			other_user.username,
+			last_message.content,
+			last_message.created_at
+		FROM direct_conversations dc
+		JOIN users other_user
+			ON other_user.id = CASE
+				WHEN dc.user_one_id = $1 THEN dc.user_two_id
+				ELSE dc.user_one_id
+			END
+		LEFT JOIN LATERAL (
+			SELECT
+				m.content,
+				m.created_at
+			FROM messages m
+			WHERE m.conversation_id = dc.id
+			ORDER BY m.id DESC
+			LIMIT 1
+		) last_message ON TRUE
+		WHERE dc.user_one_id = $1
+		   OR dc.user_two_id = $1
+		ORDER BY
+			COALESCE(last_message.created_at, dc.created_at) DESC,
+			dc.id DESC
+	`
+
+	rows, err := repository.database.Query(ctx, query, userID)
+	if err != nil {
+		return nil, fmt.Errorf("list user conversations: %w", err)
+	}
+	defer rows.Close()
+
+	conversations := make([]ConversationSummary, 0)
+
+	for rows.Next() {
+		var summary ConversationSummary
+		var lastMessage pgtype.Text
+		var lastMessageTime pgtype.Timestamptz
+
+		err := rows.Scan(
+			&summary.ID,
+			&summary.UserID,
+			&summary.Name,
+			&summary.Username,
+			&lastMessage,
+			&lastMessageTime,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("scan conversation summary: %w", err)
+		}
+
+		if lastMessage.Valid {
+			value := lastMessage.String
+			summary.LastMessage = &value
+		}
+
+		if lastMessageTime.Valid {
+			value := lastMessageTime.Time
+			summary.LastMessageTime = &value
+		}
+
+		conversations = append(conversations, summary)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate conversations: %w", err)
+	}
+
+	return conversations, nil
 }

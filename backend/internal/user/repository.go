@@ -177,3 +177,47 @@ func (repository *Repository) Search(
 
 	return users, nil
 }
+
+func (repository *Repository) FindByID(
+	ctx context.Context,
+	userID int64,
+) (*User, error) {
+	query := `
+		SELECT
+			id,
+			name,
+			username,
+			email,
+			password_hash,
+			created_at,
+			updated_at
+		FROM users
+		WHERE id = $1
+	`
+
+	foundUser := &User{}
+
+	err := repository.database.QueryRow(
+		ctx,
+		query,
+		userID,
+	).Scan(
+		&foundUser.ID,
+		&foundUser.Name,
+		&foundUser.Username,
+		&foundUser.Email,
+		&foundUser.PasswordHash,
+		&foundUser.CreatedAt,
+		&foundUser.UpdatedAt,
+	)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrUserNotFound
+		}
+
+		return nil, fmt.Errorf("find user by id: %w", err)
+	}
+
+	return foundUser, nil
+}

@@ -9,3 +9,12 @@ type DirectConversation struct {
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
+
+type ConversationSummary struct {
+	ID              int64
+	UserID          int64
+	Name            string
+	Username        string
+	LastMessage     *string
+	LastMessageTime *time.Time
+}
