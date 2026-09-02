@@ -11,8 +11,13 @@ import (
 	"github.com/ALirezamirfakhraeii/samatalk/backend/internal/platform/httpresponse"
 )
 
+type RealtimeDeliverer interface {
+	Deliver(userID int64, payload []byte)
+}
+
 type Handler struct {
-	service *Service
+	service  *Service
+	realtime RealtimeDeliverer
 }
 
 type sendMessageRequest struct {
@@ -27,9 +32,10 @@ type messageResponseData struct {
 	CreatedAt      time.Time `json:"created_at"`
 }
 
-func NewHandler(service *Service) *Handler {
+func NewHandler(service *Service, realtime RealtimeDeliverer) *Handler {
 	return &Handler{
-		service: service,
+		service:  service,
+		realtime: realtime,
 	}
 }
 
@@ -71,44 +77,40 @@ func (handler *Handler) Send(
 		httpresponse.Error(
 			responseWriter,
 			http.StatusBadRequest,
-			"INVALID_JSON",
+			"INVALID_REQUEST",
 			"invalid request body",
 			nil,
 		)
 		return
 	}
 
-	sentMessage, err := handler.service.Send(
+	sendResult, err := handler.service.Send(
 		request.Context(),
 		currentUser.ID,
 		conversationID,
 		requestBody.Content,
 	)
-
 	if err != nil {
-		if errors.Is(err, ErrEmptyMessage) {
+		switch {
+		case errors.Is(err, ErrEmptyMessage):
 			httpresponse.Error(
 				responseWriter,
-				http.StatusBadRequest,
+				http.StatusUnprocessableEntity,
 				"EMPTY_MESSAGE",
-				"message cannot be empty",
+				"message content is required",
 				nil,
 			)
-			return
-		}
 
-		if errors.Is(err, ErrMessageTooLong) {
+		case errors.Is(err, ErrMessageTooLong):
 			httpresponse.Error(
 				responseWriter,
-				http.StatusBadRequest,
+				http.StatusUnprocessableEntity,
 				"MESSAGE_TOO_LONG",
-				"message must not exceed 4000 characters",
+				"message content is too long",
 				nil,
 			)
-			return
-		}
 
-		if errors.Is(err, ErrConversationDenied) {
+		case errors.Is(err, ErrConversationDenied):
 			httpresponse.Error(
 				responseWriter,
 				http.StatusNotFound,
@@ -116,30 +118,48 @@ func (handler *Handler) Send(
 				"conversation not found",
 				nil,
 			)
-			return
+
+		default:
+			httpresponse.Error(
+				responseWriter,
+				http.StatusInternalServerError,
+				"INTERNAL_ERROR",
+				"internal server error",
+				nil,
+			)
 		}
 
-		httpresponse.Error(
-			responseWriter,
-			http.StatusInternalServerError,
-			"INTERNAL_ERROR",
-			"internal server error",
-			nil,
-		)
 		return
+	}
+
+	responseData := messageResponseData{
+		ID:             sendResult.Message.ID,
+		ConversationID: sendResult.Message.ConversationID,
+		SenderID:       sendResult.Message.SenderID,
+		Content:        sendResult.Message.Content,
+		CreatedAt:      sendResult.Message.CreatedAt,
+	}
+
+	payload, err := json.Marshal(struct {
+		Type string              `json:"type"`
+		Data messageResponseData `json:"data"`
+	}{
+		Type: "message.created",
+		Data: responseData,
+	})
+
+	if err == nil {
+		handler.realtime.Deliver(
+			sendResult.RecipientUserID,
+			payload,
+		)
 	}
 
 	httpresponse.Success(
 		responseWriter,
 		http.StatusCreated,
 		"message sent successfully",
-		messageResponseData{
-			ID:             sentMessage.ID,
-			ConversationID: sentMessage.ConversationID,
-			SenderID:       sentMessage.SenderID,
-			Content:        sentMessage.Content,
-			CreatedAt:      sentMessage.CreatedAt,
-		},
+		responseData,
 	)
 }
 
@@ -202,15 +222,15 @@ func (handler *Handler) History(
 		return
 	}
 
-	results := make([]messageResponseData, 0, len(messages))
+	responseData := make([]messageResponseData, 0, len(messages))
 
-	for _, foundMessage := range messages {
-		results = append(results, messageResponseData{
-			ID:             foundMessage.ID,
-			ConversationID: foundMessage.ConversationID,
-			SenderID:       foundMessage.SenderID,
-			Content:        foundMessage.Content,
-			CreatedAt:      foundMessage.CreatedAt,
+	for _, currentMessage := range messages {
+		responseData = append(responseData, messageResponseData{
+			ID:             currentMessage.ID,
+			ConversationID: currentMessage.ConversationID,
+			SenderID:       currentMessage.SenderID,
+			Content:        currentMessage.Content,
+			CreatedAt:      currentMessage.CreatedAt,
 		})
 	}
 
@@ -218,6 +238,6 @@ func (handler *Handler) History(
 		responseWriter,
 		http.StatusOK,
 		"messages retrieved successfully",
-		results,
+		responseData,
 	)
 }

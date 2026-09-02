@@ -1,4 +1,9 @@
-import {useEffect, useState} from 'react'
+import {
+    useEffect,
+    useRef,
+    useState,
+    type FormEvent,
+} from 'react'
 
 import {
     Bell,
@@ -28,11 +33,26 @@ import {
     type Message,
 } from './messageApi'
 
+import {
+    connectRealtime,
+    type RealtimeEvent,
+} from '../../shared/realtime/socket'
+
 import './ChatsPage.css'
+
+type MessageCreatedEvent = RealtimeEvent<Message>
 
 function ChatsPage() {
     const [activeConversationId, setActiveConversationId] =
         useState<number | null>(null)
+
+    const messageInputRef =
+        useRef<HTMLInputElement>(null)
+
+
+    const messagesAreaRef =
+        useRef<HTMLDivElement>(null)
+
 
     const [activeUser, setActiveUser] =
         useState<SearchUser | null>(null)
@@ -47,7 +67,7 @@ function ChatsPage() {
         useState('')
 
     const [isLoadingConversations, setIsLoadingConversations] =
-        useState(false)
+        useState(true)
 
     const [isLoadingMessages, setIsLoadingMessages] =
         useState(false)
@@ -61,106 +81,225 @@ function ChatsPage() {
     const [messagesError, setMessagesError] =
         useState('')
 
-    async function loadConversations() {
-        setIsLoadingConversations(true)
+    async function loadConversations(
+        showLoading = true,
+    ) {
+        if (showLoading) {
+            setIsLoadingConversations(true)
+        }
+
         setConversationsError('')
 
         try {
             const response = await getConversations()
 
             if (!response.success) {
-                setConversationsError(response.error.message)
+                setConversationsError(
+                    response.error.message,
+                )
                 return
             }
 
             setConversations(response.data)
         } catch {
-            setConversationsError('Could not load conversations.')
+            setConversationsError(
+                'Could not load conversations.',
+            )
         } finally {
-            setIsLoadingConversations(false)
+            if (showLoading) {
+                setIsLoadingConversations(false)
+            }
         }
     }
 
     useEffect(() => {
-        loadConversations()
-    }, [])
-
-    useEffect(() => {
-        if (!activeConversationId) {
-            setMessages([])
-            return
-        }
-
-        let isActive = true
-
-        async function loadMessages() {
-            setIsLoadingMessages(true)
-            setMessagesError('')
-
-            try {
-                const response = await getMessages(
-                    activeConversationId!,
-                )
-
-                if (!isActive) {
+        let cancelled = false
+        void getConversations()
+            .then((response) => {
+                if (cancelled) {
                     return
                 }
 
                 if (!response.success) {
-                    setMessagesError(response.error.message)
+                    setConversationsError(
+                        response.error.message,
+                    )
+                    return
+                }
+
+                setConversations(response.data)
+            })
+            .catch(() => {
+                if (!cancelled) {
+                    setConversationsError(
+                        'Could not load conversations.',
+                    )
+                }
+            })
+            .finally(() => {
+                if (!cancelled) {
+                    setIsLoadingConversations(false)
+                }
+            })
+
+        return () => {
+            cancelled = true
+        }
+    }, [])
+
+
+    useEffect(() => {
+        const messagesArea = messagesAreaRef.current
+
+        if (!messagesArea) {
+            return
+        }
+
+        const frame = requestAnimationFrame(() => {
+            messagesArea.scrollTop =
+                messagesArea.scrollHeight
+        })
+
+        return () => {
+            cancelAnimationFrame(frame)
+        }
+    }, [messages])
+
+
+
+    useEffect(() => {
+        if (!activeConversationId) {
+            return
+        }
+
+        let cancelled = false
+
+        void getMessages(activeConversationId)
+            .then((response) => {
+                if (cancelled) {
+                    return
+                }
+
+                if (!response.success) {
+                    setMessagesError(
+                        response.error.message,
+                    )
                     setMessages([])
                     return
                 }
 
                 setMessages(response.data)
-            } catch {
-                if (isActive) {
-                    setMessagesError('Could not load messages.')
+            })
+            .catch(() => {
+                if (!cancelled) {
+                    setMessagesError(
+                        'Could not load messages.',
+                    )
                     setMessages([])
                 }
-            } finally {
-                if (isActive) {
+            })
+            .finally(() => {
+                if (!cancelled) {
                     setIsLoadingMessages(false)
                 }
-            }
-        }
-
-        loadMessages()
+            })
 
         return () => {
-            isActive = false
+            cancelled = true
         }
     }, [activeConversationId])
+
+    useEffect(() => {
+        const disconnect = connectRealtime(
+            (event: RealtimeEvent) => {
+                if (event.type !== 'message.created') {
+                    return
+                }
+
+                const messageEvent =
+                    event as MessageCreatedEvent
+
+                const incomingMessage =
+                    messageEvent.data
+
+                if (
+                    incomingMessage.conversation_id !==
+                    activeConversationId
+                ) {
+                    return
+                }
+
+                setMessages((currentMessages) => {
+                    const alreadyExists =
+                        currentMessages.some(
+                            (message) =>
+                                message.id ===
+                                incomingMessage.id,
+                        )
+
+                    if (alreadyExists) {
+                        return currentMessages
+                    }
+
+                    return [
+                        ...currentMessages,
+                        incomingMessage,
+                    ]
+                })
+            },
+        )
+
+        return disconnect
+    }, [activeConversationId])
+
+    function openConversation(
+        conversationId: number,
+        user: SearchUser,
+    ) {
+        if (
+            conversationId !==
+            activeConversationId
+        ) {
+            setMessages([])
+            setMessagesError('')
+            setIsLoadingMessages(true)
+
+            setActiveConversationId(
+                conversationId,
+            )
+        }
+
+        setActiveUser(user)
+        setMessageText('')
+    }
 
     function handleConversationStarted(
         conversation: Conversation,
         user: SearchUser,
     ) {
-        setActiveConversationId(conversation.id)
-        setActiveUser(user)
-        setMessageText('')
-        setMessagesError('')
+        openConversation(
+            conversation.id,
+            user,
+        )
 
-        loadConversations()
+        void loadConversations()
     }
 
     function handleConversationSelect(
         conversation: ConversationSummary,
     ) {
-        setActiveConversationId(conversation.id)
-
-        setActiveUser({
-            id: conversation.user_id,
-            name: conversation.name,
-            username: conversation.username,
-        })
-
-        setMessageText('')
-        setMessagesError('')
+        openConversation(
+            conversation.id,
+            {
+                id: conversation.user_id,
+                name: conversation.name,
+                username: conversation.username,
+            },
+        )
     }
 
     async function handleSendMessage(
-        event: React.FormEvent<HTMLFormElement>,
+        event: FormEvent<HTMLFormElement>,
     ) {
         event.preventDefault()
 
@@ -184,40 +323,66 @@ function ChatsPage() {
             )
 
             if (!response.success) {
-                setMessagesError(response.error.message)
+                setMessagesError(
+                    response.error.message,
+                )
                 return
             }
 
-            setMessages((currentMessages) => [
-                ...currentMessages,
-                response.data,
-            ])
+            setMessages((currentMessages) => {
+                const alreadyExists =
+                    currentMessages.some(
+                        (message) =>
+                            message.id ===
+                            response.data.id,
+                    )
+
+                if (alreadyExists) {
+                    return currentMessages
+                }
+
+                return [
+                    ...currentMessages,
+                    response.data,
+                ]
+            })
 
             setMessageText('')
 
-            await loadConversations()
+            await loadConversations(false)
         } catch {
-            setMessagesError('Could not send message.')
+            setMessagesError(
+                'Could not send message.',
+            )
         } finally {
             setIsSendingMessage(false)
+            requestAnimationFrame(() => {
+                messageInputRef.current?.focus()
+            })
         }
     }
 
     function getInitials(name: string) {
         return name
             .split(' ')
-            .map((part) => part.charAt(0))
+            .map((part) =>
+                part.charAt(0),
+            )
             .join('')
             .slice(0, 2)
             .toUpperCase()
     }
 
-    function formatTime(value: string | null) {
+    function formatTime(
+        value: string | null,
+    ) {
         if (!value) {
             return ''
         }
 
-        return new Date(value).toLocaleTimeString([], {
+        return new Date(
+            value,
+        ).toLocaleTimeString([], {
             hour: '2-digit',
             minute: '2-digit',
         })
@@ -277,54 +442,66 @@ function ChatsPage() {
 
                     {!isLoadingConversations &&
                         !conversationsError &&
-                        conversations.length === 0 && (
+                        conversations.length ===
+                        0 && (
                             <div className="conversation-list-status">
                                 No conversations yet.
                             </div>
                         )}
 
                     {!isLoadingConversations &&
-                        conversations.map((conversation) => (
-                            <button
-                                key={conversation.id}
-                                type="button"
-                                className={`conversation-item ${
-                                    activeConversationId === conversation.id
-                                        ? 'active'
-                                        : ''
-                                }`}
-                                onClick={() =>
-                                    handleConversationSelect(conversation)
-                                }
-                            >
-                                <div className="avatar-wrapper">
-                                    <div className="avatar">
-                                        {getInitials(conversation.name)}
-                                    </div>
-                                </div>
-
-                                <div className="conversation-content">
-                                    <div className="conversation-top">
-                                        <strong>
-                                            {conversation.name}
-                                        </strong>
-
-                                        <span>
-                      {formatTime(
-                          conversation.last_message_time,
-                      )}
-                    </span>
+                        conversations.map(
+                            (conversation) => (
+                                <button
+                                    key={
+                                        conversation.id
+                                    }
+                                    type="button"
+                                    className={`conversation-item ${
+                                        activeConversationId ===
+                                        conversation.id
+                                            ? 'active'
+                                            : ''
+                                    }`}
+                                    onClick={() =>
+                                        handleConversationSelect(
+                                            conversation,
+                                        )
+                                    }
+                                >
+                                    <div className="avatar-wrapper">
+                                        <div className="avatar">
+                                            {getInitials(
+                                                conversation.name,
+                                            )}
+                                        </div>
                                     </div>
 
-                                    <div className="conversation-bottom">
-                                        <p>
-                                            {conversation.last_message ??
-                                                'No messages yet'}
-                                        </p>
+                                    <div className="conversation-content">
+                                        <div className="conversation-top">
+                                            <strong>
+                                                {
+                                                    conversation.name
+                                                }
+                                            </strong>
+
+                                            <span>
+                                                {formatTime(
+                                                    conversation.last_message_time,
+                                                )}
+                                            </span>
+                                        </div>
+
+                                        <div className="conversation-bottom">
+                                            <p>
+                                                {conversation.last_message ??
+                                                    'No messages yet'}
+                                            </p>
+                                        </div>
                                     </div>
-                                </div>
-                            </button>
-                        ))}
+                                </button>
+                            ),
+                        )}
                 </div>
 
                 <div className="sidebar-profile">
@@ -352,7 +529,9 @@ function ChatsPage() {
                         <div className="avatar-wrapper">
                             <div className="avatar">
                                 {activeUser
-                                    ? getInitials(activeUser.name)
+                                    ? getInitials(
+                                        activeUser.name,
+                                    )
                                     : '?'}
                             </div>
                         </div>
@@ -364,10 +543,10 @@ function ChatsPage() {
                             </strong>
 
                             <span>
-                {activeUser
-                    ? `@${activeUser.username}`
-                    : 'Search for someone to start chatting'}
-              </span>
+                                {activeUser
+                                    ? `@${activeUser.username}`
+                                    : 'Search for someone to start chatting'}
+                            </span>
                         </div>
                     </div>
 
@@ -397,15 +576,21 @@ function ChatsPage() {
                             className="icon-button action"
                             type="button"
                         >
-                            <MoreHorizontal size={20}/>
+                            <MoreHorizontal
+                                size={20}
+                            />
                         </button>
                     </div>
                 </header>
 
-                <div className="messages-area">
+                <div
+                    ref={messagesAreaRef}
+                    className="messages-area"
+                >
                     {!activeConversationId && (
                         <div className="messages-status">
-                            Select a conversation to start messaging.
+                            Select a conversation to
+                            start messaging.
                         </div>
                     )}
 
@@ -417,6 +602,7 @@ function ChatsPage() {
                         )}
 
                     {activeConversationId &&
+                        !isLoadingMessages &&
                         messagesError && (
                             <div className="messages-status messages-status-error">
                                 {messagesError}
@@ -428,7 +614,8 @@ function ChatsPage() {
                         !messagesError &&
                         messages.length === 0 && (
                             <div className="messages-status">
-                                No messages yet. Start the conversation.
+                                No messages yet. Start
+                                the conversation.
                             </div>
                         )}
 
@@ -436,7 +623,8 @@ function ChatsPage() {
                         !isLoadingMessages &&
                         messages.map((message) => {
                             const isReceived =
-                                message.sender_id === activeUser?.id
+                                message.sender_id ===
+                                activeUser?.id
 
                             return (
                                 <div
@@ -450,7 +638,9 @@ function ChatsPage() {
                                     {isReceived && (
                                         <div className="avatar message-avatar">
                                             {activeUser
-                                                ? getInitials(activeUser.name)
+                                                ? getInitials(
+                                                    activeUser.name,
+                                                )
                                                 : '?'}
                                         </div>
                                     )}
@@ -463,14 +653,16 @@ function ChatsPage() {
                                                     : 'sent-bubble'
                                             }`}
                                         >
-                                            {message.content}
+                                            {
+                                                message.content
+                                            }
                                         </div>
 
                                         <span className="message-time">
-                      {formatTime(
-                          message.created_at,
-                      )}
-                    </span>
+                                            {formatTime(
+                                                message.created_at,
+                                            )}
+                                        </span>
                                     </div>
                                 </div>
                             )
@@ -480,12 +672,16 @@ function ChatsPage() {
                 <div className="composer-wrapper">
                     <form
                         className="composer"
-                        onSubmit={handleSendMessage}
+                        onSubmit={
+                            handleSendMessage
+                        }
                     >
                         <button
                             type="button"
                             className="composer-button"
-                            disabled={!activeConversationId}
+                            disabled={
+                                !activeConversationId
+                            }
                         >
                             <Plus size={19}/>
                         </button>
@@ -493,13 +689,16 @@ function ChatsPage() {
                         <button
                             type="button"
                             className="composer-button"
-                            disabled={!activeConversationId}
+                            disabled={
+                                !activeConversationId
+                            }
                         >
                             <Paperclip size={18}/>
                         </button>
 
                         <input
                             type="text"
+                            ref={messageInputRef}
                             value={messageText}
                             placeholder={
                                 activeConversationId
@@ -511,14 +710,18 @@ function ChatsPage() {
                                 isSendingMessage
                             }
                             onChange={(event) =>
-                                setMessageText(event.target.value)
+                                setMessageText(
+                                    event.target.value,
+                                )
                             }
                         />
 
                         <button
                             type="button"
                             className="composer-button"
-                            disabled={!activeConversationId}
+                            disabled={
+                                !activeConversationId
+                            }
                         >
                             <Smile size={19}/>
                         </button>

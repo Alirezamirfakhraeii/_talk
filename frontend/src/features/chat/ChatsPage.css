@@ -1,11 +1,11 @@
 .chat-app {
     width: 100%;
     height: 100vh;
-    display: grid;
     grid-template-columns: 330px minmax(0, 1fr);
     overflow: hidden;
     background: #f4f6fa;
     color: #171a21;
+    display: flex;
 }
 
 .chat-sidebar {
@@ -14,7 +14,11 @@
     flex-direction: column;
     background: #111827;
     border-right: 1px solid rgba(255, 255, 255, 0.06);
+    height: 100vh;
+    flex-shrink: 0;
+    overflow: hidden;
 }
+
 
 .sidebar-brand {
     height: 78px;
@@ -290,6 +294,11 @@
     display: flex;
     flex-direction: column;
     background: #f6f7fb;
+    flex: 1;
+    height: 100vh;
+    min-height: 0;
+    overflow: hidden;
+
 }
 
 .conversation-header {
@@ -348,8 +357,9 @@
 
 .messages-area {
     flex: 1;
-    padding: 28px clamp(24px, 5vw, 72px);
+    min-height: 0;
     overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .date-divider {

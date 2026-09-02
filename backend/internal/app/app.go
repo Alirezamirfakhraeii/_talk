@@ -16,11 +16,13 @@ import (
 
 	"github.com/ALirezamirfakhraeii/samatalk/backend/internal/auth"
 	"github.com/ALirezamirfakhraeii/samatalk/backend/internal/message"
+	"github.com/ALirezamirfakhraeii/samatalk/backend/internal/realtime"
 )
 
 type App struct {
-	server   *httpserver.Server
-	database *pgxpool.Pool
+	server      *httpserver.Server
+	database    *pgxpool.Pool
+	realtimeHub *realtime.Hub
 }
 
 func New(
@@ -59,6 +61,16 @@ func New(
 
 	authMiddleware := auth.NewMiddleware(authRepository)
 
+	realtimeHub := realtime.NewHub()
+
+	realtimeHandler := realtime.NewHandler(realtimeHub)
+
+	realtime.RegisterRoutes(
+		mux,
+		realtimeHandler,
+		authMiddleware,
+	)
+
 	userService := user.NewService(
 		userRepository,
 		authRepository,
@@ -90,7 +102,10 @@ func New(
 		conversationRepository,
 	)
 
-	messageHandler := message.NewHandler(messageService)
+	messageHandler := message.NewHandler(
+		messageService,
+		realtimeHub,
+	)
 
 	message.RegisterRoutes(
 		mux,
@@ -110,12 +125,14 @@ func New(
 	)
 
 	return &App{
-		server:   server,
-		database: databasePool,
+		server:      server,
+		database:    databasePool,
+		realtimeHub: realtimeHub,
 	}, nil
 }
 
 func (app *App) Run(ctx context.Context) error {
+	go app.realtimeHub.Run(ctx)
 	return app.server.Run(ctx)
 }
 

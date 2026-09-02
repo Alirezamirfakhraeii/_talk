@@ -21,6 +21,11 @@ type Service struct {
 	conversationRepository *conversation.Repository
 }
 
+type SendResult struct {
+	Message         *Message
+	RecipientUserID int64
+}
+
 func NewService(
 	repository *Repository,
 	conversationRepository *conversation.Repository,
@@ -36,7 +41,7 @@ func (service *Service) Send(
 	currentUserID int64,
 	conversationID int64,
 	content string,
-) (*Message, error) {
+) (*SendResult, error) {
 	content = strings.TrimSpace(content)
 
 	if content == "" {
@@ -47,7 +52,7 @@ func (service *Service) Send(
 		return nil, ErrMessageTooLong
 	}
 
-	_, err := service.conversationRepository.FindByIDForUser(
+	foundConversation, err := service.conversationRepository.FindByIDForUser(
 		ctx,
 		conversationID,
 		currentUserID,
@@ -60,6 +65,12 @@ func (service *Service) Send(
 		return nil, fmt.Errorf("check conversation access: %w", err)
 	}
 
+	recipientUserID := foundConversation.UserOneID
+
+	if recipientUserID == currentUserID {
+		recipientUserID = foundConversation.UserTwoID
+	}
+
 	newMessage := &Message{
 		ConversationID: conversationID,
 		SenderID:       currentUserID,
@@ -70,7 +81,10 @@ func (service *Service) Send(
 		return nil, fmt.Errorf("send message: %w", err)
 	}
 
-	return newMessage, nil
+	return &SendResult{
+		Message:         newMessage,
+		RecipientUserID: recipientUserID,
+	}, nil
 }
 
 func (service *Service) History(
