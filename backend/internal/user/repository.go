@@ -15,10 +15,15 @@ type Repository struct {
 }
 
 func NewRepository(database *pgxpool.Pool) *Repository {
-	return &Repository{database: database}
+	return &Repository{
+		database: database,
+	}
 }
 
-func (repository *Repository) Create(ctx context.Context, user *User) error {
+func (repository *Repository) Create(
+	ctx context.Context,
+	user *User,
+) error {
 	query := `
 		INSERT INTO users (
 			name,
@@ -47,25 +52,11 @@ func (repository *Repository) Create(ctx context.Context, user *User) error {
 	)
 
 	if err != nil {
-		var pgError *pgconn.PgError
-
-		if errors.As(err, &pgError) &&
-			pgError.Code == "23505" {
-
-			switch pgError.ConstraintName {
-
-			case "users_email_key":
-				return ErrEmailAlreadyExists
-
-			case "users_username_key":
-				return ErrUsernameAlreadyExists
-			}
+		if mappedError := mapPostgresError(err); mappedError != nil {
+			return mappedError
 		}
 
-		return fmt.Errorf(
-			"create user: %w",
-			err,
-		)
+		return fmt.Errorf("create user: %w", err)
 	}
 
 	return nil
@@ -82,6 +73,8 @@ func (repository *Repository) FindByEmail(
 			username,
 			email,
 			password_hash,
+			COALESCE(bio, ''),
+			COALESCE(avatar_path, ''),
 			created_at,
 			updated_at
 		FROM users
@@ -100,20 +93,70 @@ func (repository *Repository) FindByEmail(
 		&foundUser.Username,
 		&foundUser.Email,
 		&foundUser.PasswordHash,
+		&foundUser.Bio,
+		&foundUser.AvatarPath,
 		&foundUser.CreatedAt,
 		&foundUser.UpdatedAt,
 	)
 
 	if err != nil {
-		if errors.Is(
-			err,
-			pgx.ErrNoRows,
-		) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrUserNotFound
 		}
 
 		return nil, fmt.Errorf(
 			"find user by email: %w",
+			err,
+		)
+	}
+
+	return foundUser, nil
+}
+
+func (repository *Repository) FindByID(
+	ctx context.Context,
+	userID int64,
+) (*User, error) {
+	query := `
+		SELECT
+			id,
+			name,
+			username,
+			email,
+			password_hash,
+			COALESCE(bio, ''),
+			COALESCE(avatar_path, ''),
+			created_at,
+			updated_at
+		FROM users
+		WHERE id = $1
+	`
+
+	foundUser := &User{}
+
+	err := repository.database.QueryRow(
+		ctx,
+		query,
+		userID,
+	).Scan(
+		&foundUser.ID,
+		&foundUser.Name,
+		&foundUser.Username,
+		&foundUser.Email,
+		&foundUser.PasswordHash,
+		&foundUser.Bio,
+		&foundUser.AvatarPath,
+		&foundUser.CreatedAt,
+		&foundUser.UpdatedAt,
+	)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrUserNotFound
+		}
+
+		return nil, fmt.Errorf(
+			"find user by id: %w",
 			err,
 		)
 	}
@@ -150,7 +193,10 @@ func (repository *Repository) Search(
 		searchPattern,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("search users: %w", err)
+		return nil, fmt.Errorf(
+			"search users: %w",
+			err,
+		)
 	}
 	defer rows.Close()
 
@@ -165,59 +211,121 @@ func (repository *Repository) Search(
 			&foundUser.Username,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("scan searched user: %w", err)
+			return nil, fmt.Errorf(
+				"scan searched user: %w",
+				err,
+			)
 		}
 
 		users = append(users, foundUser)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate searched users: %w", err)
+		return nil, fmt.Errorf(
+			"iterate searched users: %w",
+			err,
+		)
 	}
 
 	return users, nil
 }
 
-func (repository *Repository) FindByID(
+func (repository *Repository) UpdateProfile(
 	ctx context.Context,
-	userID int64,
-) (*User, error) {
+	user *User,
+) error {
 	query := `
-		SELECT
-			id,
-			name,
-			username,
-			email,
-			password_hash,
-			created_at,
-			updated_at
-		FROM users
+		UPDATE users
+		SET
+			name = $2,
+			username = $3,
+			bio = $4,
+			updated_at = NOW()
 		WHERE id = $1
+		RETURNING updated_at
 	`
-
-	foundUser := &User{}
 
 	err := repository.database.QueryRow(
 		ctx,
 		query,
-		userID,
+		user.ID,
+		user.Name,
+		user.Username,
+		user.Bio,
 	).Scan(
-		&foundUser.ID,
-		&foundUser.Name,
-		&foundUser.Username,
-		&foundUser.Email,
-		&foundUser.PasswordHash,
-		&foundUser.CreatedAt,
-		&foundUser.UpdatedAt,
+		&user.UpdatedAt,
 	)
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrUserNotFound
+			return ErrUserNotFound
 		}
 
-		return nil, fmt.Errorf("find user by id: %w", err)
+		if mappedError := mapPostgresError(err); mappedError != nil {
+			return mappedError
+		}
+
+		return fmt.Errorf(
+			"update user profile: %w",
+			err,
+		)
 	}
 
-	return foundUser, nil
+	return nil
+}
+
+func mapPostgresError(err error) error {
+	var pgError *pgconn.PgError
+
+	if !errors.As(err, &pgError) {
+		return nil
+	}
+
+	if pgError.Code != "23505" {
+		return nil
+	}
+
+	switch pgError.ConstraintName {
+	case "users_email_key":
+		return ErrEmailAlreadyExists
+
+	case "users_username_key":
+		return ErrUsernameAlreadyExists
+
+	default:
+		return nil
+	}
+}
+
+func (repository *Repository) UpdateAvatarPath(
+	ctx context.Context,
+	userID int64,
+	avatarPath string,
+) error {
+	query := `
+		UPDATE users
+		SET
+			avatar_path = $2,
+			updated_at = NOW()
+		WHERE id = $1
+	`
+
+	commandTag, err := repository.database.Exec(
+		ctx,
+		query,
+		userID,
+		avatarPath,
+	)
+	if err != nil {
+		return fmt.Errorf(
+			"update user avatar: %w",
+			err,
+		)
+	}
+
+	if commandTag.RowsAffected() == 0 {
+		return ErrUserNotFound
+	}
+
+	return nil
 }

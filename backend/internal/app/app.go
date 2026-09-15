@@ -39,8 +39,17 @@ func New(
 			err,
 		)
 	}
-
 	mux := http.NewServeMux()
+
+	mux.Handle(
+		"GET /uploads/",
+		http.StripPrefix(
+			"/uploads/",
+			http.FileServer(
+				http.Dir("./uploads"),
+			),
+		),
+	)
 
 	healthHandler := health.NewHandler(
 		databasePool,

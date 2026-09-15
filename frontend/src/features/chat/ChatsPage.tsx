@@ -18,8 +18,15 @@ import {
     Video,
 } from 'lucide-react'
 
+import ProfileModal from '../user/profile/ProfileModal'
+
+import {
+    getProfile,
+    type UserProfile,
+} from '../user/profile/profileApi'
+
 import UserSearch from '../user/search/UserSearch'
-import type {SearchUser} from '../user/search/userSearchApi'
+import type { SearchUser } from '../user/search/userSearchApi'
 
 import {
     getConversations,
@@ -46,14 +53,6 @@ function ChatsPage() {
     const [activeConversationId, setActiveConversationId] =
         useState<number | null>(null)
 
-    const messageInputRef =
-        useRef<HTMLInputElement>(null)
-
-
-    const messagesAreaRef =
-        useRef<HTMLDivElement>(null)
-
-
     const [activeUser, setActiveUser] =
         useState<SearchUser | null>(null)
 
@@ -75,11 +74,23 @@ function ChatsPage() {
     const [isSendingMessage, setIsSendingMessage] =
         useState(false)
 
+    const [currentProfile, setCurrentProfile] =
+        useState<UserProfile | null>(null)
+
+    const [isProfileOpen, setIsProfileOpen] =
+        useState(false)
+
     const [conversationsError, setConversationsError] =
         useState('')
 
     const [messagesError, setMessagesError] =
         useState('')
+
+    const messageInputRef =
+        useRef<HTMLInputElement>(null)
+
+    const messagesAreaRef =
+        useRef<HTMLDivElement>(null)
 
     async function loadConversations(
         showLoading = true,
@@ -114,6 +125,7 @@ function ChatsPage() {
 
     useEffect(() => {
         let cancelled = false
+
         void getConversations()
             .then((response) => {
                 if (cancelled) {
@@ -147,25 +159,50 @@ function ChatsPage() {
         }
     }, [])
 
+    useEffect(() => {
+        let cancelled = false
+
+        void getProfile()
+            .then((response) => {
+                if (
+                    cancelled ||
+                    !response.success
+                ) {
+                    return
+                }
+
+                setCurrentProfile(response.data)
+            })
+            .catch(() => {
+                if (!cancelled) {
+                    setCurrentProfile(null)
+                }
+            })
+
+        return () => {
+            cancelled = true
+        }
+    }, [])
 
     useEffect(() => {
-        const messagesArea = messagesAreaRef.current
+        const messagesArea =
+            messagesAreaRef.current
 
         if (!messagesArea) {
             return
         }
 
-        const frame = requestAnimationFrame(() => {
-            messagesArea.scrollTop =
-                messagesArea.scrollHeight
-        })
+        const frame = requestAnimationFrame(
+            () => {
+                messagesArea.scrollTop =
+                    messagesArea.scrollHeight
+            },
+        )
 
         return () => {
             cancelAnimationFrame(frame)
         }
     }, [messages])
-
-
 
     useEffect(() => {
         if (!activeConversationId) {
@@ -212,7 +249,10 @@ function ChatsPage() {
     useEffect(() => {
         const disconnect = connectRealtime(
             (event: RealtimeEvent) => {
-                if (event.type !== 'message.created') {
+                if (
+                    event.type !==
+                    'message.created'
+                ) {
                     return
                 }
 
@@ -229,23 +269,25 @@ function ChatsPage() {
                     return
                 }
 
-                setMessages((currentMessages) => {
-                    const alreadyExists =
-                        currentMessages.some(
-                            (message) =>
-                                message.id ===
-                                incomingMessage.id,
-                        )
+                setMessages(
+                    (currentMessages) => {
+                        const alreadyExists =
+                            currentMessages.some(
+                                (message) =>
+                                    message.id ===
+                                    incomingMessage.id,
+                            )
 
-                    if (alreadyExists) {
-                        return currentMessages
-                    }
+                        if (alreadyExists) {
+                            return currentMessages
+                        }
 
-                    return [
-                        ...currentMessages,
-                        incomingMessage,
-                    ]
-                })
+                        return [
+                            ...currentMessages,
+                            incomingMessage,
+                        ]
+                    },
+                )
             },
         )
 
@@ -293,7 +335,8 @@ function ChatsPage() {
             {
                 id: conversation.user_id,
                 name: conversation.name,
-                username: conversation.username,
+                username:
+                conversation.username,
             },
         )
     }
@@ -309,7 +352,10 @@ function ChatsPage() {
 
         const content = messageText.trim()
 
-        if (!content || isSendingMessage) {
+        if (
+            !content ||
+            isSendingMessage
+        ) {
             return
         }
 
@@ -317,10 +363,11 @@ function ChatsPage() {
         setMessagesError('')
 
         try {
-            const response = await sendMessage(
-                activeConversationId,
-                content,
-            )
+            const response =
+                await sendMessage(
+                    activeConversationId,
+                    content,
+                )
 
             if (!response.success) {
                 setMessagesError(
@@ -329,23 +376,25 @@ function ChatsPage() {
                 return
             }
 
-            setMessages((currentMessages) => {
-                const alreadyExists =
-                    currentMessages.some(
-                        (message) =>
-                            message.id ===
-                            response.data.id,
-                    )
+            setMessages(
+                (currentMessages) => {
+                    const alreadyExists =
+                        currentMessages.some(
+                            (message) =>
+                                message.id ===
+                                response.data.id,
+                        )
 
-                if (alreadyExists) {
-                    return currentMessages
-                }
+                    if (alreadyExists) {
+                        return currentMessages
+                    }
 
-                return [
-                    ...currentMessages,
-                    response.data,
-                ]
-            })
+                    return [
+                        ...currentMessages,
+                        response.data,
+                    ]
+                },
+            )
 
             setMessageText('')
 
@@ -356,6 +405,7 @@ function ChatsPage() {
             )
         } finally {
             setIsSendingMessage(false)
+
             requestAnimationFrame(() => {
                 messageInputRef.current?.focus()
             })
@@ -397,15 +447,21 @@ function ChatsPage() {
                     </div>
 
                     <div className="brand-text">
-                        <strong>SamaTalk</strong>
-                        <span>Workspace</span>
+                        <strong>
+                            SamaTalk
+                        </strong>
+                        <span>
+                            Workspace
+                        </span>
                     </div>
 
                     <button
                         className="icon-button"
                         type="button"
                     >
-                        <ChevronDown size={18}/>
+                        <ChevronDown
+                            size={18}
+                        />
                     </button>
                 </div>
 
@@ -416,13 +472,15 @@ function ChatsPage() {
                 />
 
                 <div className="sidebar-section-header">
-                    <span>Messages</span>
+                    <span>
+                        Messages
+                    </span>
 
                     <button
                         className="icon-button small"
                         type="button"
                     >
-                        <Plus size={17}/>
+                        <Plus size={17} />
                     </button>
                 </div>
 
@@ -436,7 +494,9 @@ function ChatsPage() {
                     {!isLoadingConversations &&
                         conversationsError && (
                             <div className="conversation-list-status error">
-                                {conversationsError}
+                                {
+                                    conversationsError
+                                }
                             </div>
                         )}
 
@@ -506,19 +566,44 @@ function ChatsPage() {
 
                 <div className="sidebar-profile">
                     <div className="avatar avatar-current">
-                        AM
+                        {currentProfile?.avatar_path ? (
+                            <img
+                                src={currentProfile.avatar_path}
+                                alt={currentProfile.name}
+                                className="sidebar-profile-avatar-image"
+                            />
+                        ) : (
+                            currentProfile
+                                ? getInitials(currentProfile.name)
+                                : '?'
+                        )}
                     </div>
 
                     <div className="profile-info">
-                        <strong>Amir</strong>
-                        <span>Online</span>
+                        <strong>
+                            {currentProfile?.name ??
+                                'Loading...'}
+                        </strong>
+
+                        <span>
+                            {currentProfile
+                                ? `@${currentProfile.username}`
+                                : 'Online'}
+                        </span>
                     </div>
 
                     <button
                         className="icon-button"
                         type="button"
+                        onClick={() =>
+                            setIsProfileOpen(
+                                true,
+                            )
+                        }
                     >
-                        <Settings size={18}/>
+                        <Settings
+                            size={18}
+                        />
                     </button>
                 </div>
             </aside>
@@ -555,21 +640,27 @@ function ChatsPage() {
                             className="icon-button action"
                             type="button"
                         >
-                            <Phone size={18}/>
+                            <Phone
+                                size={18}
+                            />
                         </button>
 
                         <button
                             className="icon-button action"
                             type="button"
                         >
-                            <Video size={19}/>
+                            <Video
+                                size={19}
+                            />
                         </button>
 
                         <button
                             className="icon-button action"
                             type="button"
                         >
-                            <Bell size={18}/>
+                            <Bell
+                                size={18}
+                            />
                         </button>
 
                         <button
@@ -605,68 +696,76 @@ function ChatsPage() {
                         !isLoadingMessages &&
                         messagesError && (
                             <div className="messages-status messages-status-error">
-                                {messagesError}
+                                {
+                                    messagesError
+                                }
                             </div>
                         )}
 
                     {activeConversationId &&
                         !isLoadingMessages &&
                         !messagesError &&
-                        messages.length === 0 && (
+                        messages.length ===
+                        0 && (
                             <div className="messages-status">
-                                No messages yet. Start
-                                the conversation.
+                                No messages yet.
+                                Start the
+                                conversation.
                             </div>
                         )}
 
                     {activeConversationId &&
                         !isLoadingMessages &&
-                        messages.map((message) => {
-                            const isReceived =
-                                message.sender_id ===
-                                activeUser?.id
+                        messages.map(
+                            (message) => {
+                                const isReceived =
+                                    message.sender_id ===
+                                    activeUser?.id
 
-                            return (
-                                <div
-                                    key={message.id}
-                                    className={`message-row ${
-                                        isReceived
-                                            ? 'received'
-                                            : 'sent'
-                                    }`}
-                                >
-                                    {isReceived && (
-                                        <div className="avatar message-avatar">
-                                            {activeUser
-                                                ? getInitials(
-                                                    activeUser.name,
-                                                )
-                                                : '?'}
+                                return (
+                                    <div
+                                        key={
+                                            message.id
+                                        }
+                                        className={`message-row ${
+                                            isReceived
+                                                ? 'received'
+                                                : 'sent'
+                                        }`}
+                                    >
+                                        {isReceived && (
+                                            <div className="avatar message-avatar">
+                                                {activeUser
+                                                    ? getInitials(
+                                                        activeUser.name,
+                                                    )
+                                                    : '?'}
+                                            </div>
+                                        )}
+
+                                        <div className="message-group">
+                                            <div
+                                                className={`message-bubble ${
+                                                    isReceived
+                                                        ? 'received-bubble'
+                                                        : 'sent-bubble'
+                                                }`}
+                                            >
+                                                {
+                                                    message.content
+                                                }
+                                            </div>
+
+                                            <span className="message-time">
+                                                {formatTime(
+                                                    message.created_at,
+                                                )}
+                                            </span>
                                         </div>
-                                    )}
-
-                                    <div className="message-group">
-                                        <div
-                                            className={`message-bubble ${
-                                                isReceived
-                                                    ? 'received-bubble'
-                                                    : 'sent-bubble'
-                                            }`}
-                                        >
-                                            {
-                                                message.content
-                                            }
-                                        </div>
-
-                                        <span className="message-time">
-                                            {formatTime(
-                                                message.created_at,
-                                            )}
-                                        </span>
                                     </div>
-                                </div>
-                            )
-                        })}
+                                )
+                            },
+                        )}
                 </div>
 
                 <div className="composer-wrapper">
@@ -683,7 +782,9 @@ function ChatsPage() {
                                 !activeConversationId
                             }
                         >
-                            <Plus size={19}/>
+                            <Plus
+                                size={19}
+                            />
                         </button>
 
                         <button
@@ -693,12 +794,16 @@ function ChatsPage() {
                                 !activeConversationId
                             }
                         >
-                            <Paperclip size={18}/>
+                            <Paperclip
+                                size={18}
+                            />
                         </button>
 
                         <input
+                            ref={
+                                messageInputRef
+                            }
                             type="text"
-                            ref={messageInputRef}
                             value={messageText}
                             placeholder={
                                 activeConversationId
@@ -709,9 +814,12 @@ function ChatsPage() {
                                 !activeConversationId ||
                                 isSendingMessage
                             }
-                            onChange={(event) =>
+                            onChange={(
+                                event,
+                            ) =>
                                 setMessageText(
-                                    event.target.value,
+                                    event.target
+                                        .value,
                                 )
                             }
                         />
@@ -723,7 +831,9 @@ function ChatsPage() {
                                 !activeConversationId
                             }
                         >
-                            <Smile size={19}/>
+                            <Smile
+                                size={19}
+                            />
                         </button>
 
                         <button
@@ -735,11 +845,34 @@ function ChatsPage() {
                                 isSendingMessage
                             }
                         >
-                            <Send size={18}/>
+                            <Send
+                                size={18}
+                            />
                         </button>
                     </form>
                 </div>
             </section>
+
+            {isProfileOpen &&
+                currentProfile && (
+                    <ProfileModal
+                        profile={
+                            currentProfile
+                        }
+                        onClose={() =>
+                            setIsProfileOpen(
+                                false,
+                            )
+                        }
+                        onUpdated={(
+                            profile,
+                        ) =>
+                            setCurrentProfile(
+                                profile,
+                            )
+                        }
+                    />
+                )}
         </main>
     )
 }
