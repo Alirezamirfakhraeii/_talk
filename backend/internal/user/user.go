@@ -8,6 +8,8 @@ type User struct {
 	Username     string
 	Email        string
 	PasswordHash string
+	Bio          string
+	AvatarPath   string
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 }

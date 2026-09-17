@@ -1,4 +1,4 @@
-package conversation
+package realtime
 
 import (
 	"net/http"
@@ -12,16 +12,9 @@ func RegisterRoutes(
 	authMiddleware *auth.Middleware,
 ) {
 	mux.Handle(
-		"GET /api/v1/conversations",
+		"GET /api/v1/ws",
 		authMiddleware.Authenticate(
-			http.HandlerFunc(handler.List),
-		),
-	)
-
-	mux.Handle(
-		"POST /api/v1/conversations",
-		authMiddleware.Authenticate(
-			http.HandlerFunc(handler.Start),
+			http.HandlerFunc(handler.Connect),
 		),
 	)
 }

@@ -1,4 +1,4 @@
-package conversation
+package message
 
 import (
 	"net/http"
@@ -12,16 +12,16 @@ func RegisterRoutes(
 	authMiddleware *auth.Middleware,
 ) {
 	mux.Handle(
-		"GET /api/v1/conversations",
+		"GET /api/v1/conversations/{conversationID}/messages",
 		authMiddleware.Authenticate(
-			http.HandlerFunc(handler.List),
+			http.HandlerFunc(handler.History),
 		),
 	)
 
 	mux.Handle(
-		"POST /api/v1/conversations",
+		"POST /api/v1/conversations/{conversationID}/messages",
 		authMiddleware.Authenticate(
-			http.HandlerFunc(handler.Start),
+			http.HandlerFunc(handler.Send),
 		),
 	)
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/ALirezamirfakhraeii/samatalk/backend/internal/auth"
 	"golang.org/x/crypto/bcrypt"
@@ -42,6 +43,12 @@ type RegisterInput struct {
 type LoginInput struct {
 	Email    string
 	Password string
+}
+
+type UpdateProfileInput struct {
+	Name     string
+	Username string
+	Bio      string
 }
 
 func (service *Service) Register(
@@ -96,7 +103,6 @@ func (service *Service) Login(
 		ctx,
 		email,
 	)
-
 	if err != nil {
 		if errors.Is(
 			err,
@@ -115,7 +121,6 @@ func (service *Service) Login(
 		[]byte(foundUser.PasswordHash),
 		[]byte(input.Password),
 	)
-
 	if err != nil {
 		return nil, ErrInvalidCredentials
 	}
@@ -138,7 +143,6 @@ func (service *Service) Login(
 		tokenHash,
 		expiresAt,
 	)
-
 	if err != nil {
 		return nil, fmt.Errorf(
 			"create login session: %w",
@@ -203,8 +207,131 @@ func (service *Service) SearchUsers(
 		searchTerm,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("search users: %w", err)
+		return nil, fmt.Errorf(
+			"search users: %w",
+			err,
+		)
 	}
 
 	return users, nil
+}
+
+func (service *Service) UpdateProfile(
+	ctx context.Context,
+	currentUserID int64,
+	input UpdateProfileInput,
+) (*User, error) {
+	name := strings.TrimSpace(input.Name)
+	username := strings.TrimSpace(input.Username)
+	bio := strings.TrimSpace(input.Bio)
+
+	if name == "" {
+		return nil, ErrProfileNameRequired
+	}
+
+	if username == "" {
+		return nil, ErrProfileUsernameRequired
+	}
+
+	if utf8.RuneCountInString(bio) > 160 {
+		return nil, ErrProfileBioTooLong
+	}
+
+	foundUser, err := service.repository.FindByID(
+		ctx,
+		currentUserID,
+	)
+	if err != nil {
+		if errors.Is(err, ErrUserNotFound) {
+			return nil, ErrUserNotFound
+		}
+
+		return nil, fmt.Errorf(
+			"find user for profile update: %w",
+			err,
+		)
+	}
+
+	foundUser.Name = name
+	foundUser.Username = username
+	foundUser.Bio = bio
+
+	err = service.repository.UpdateProfile(
+		ctx,
+		foundUser,
+	)
+	if err != nil {
+		if errors.Is(
+			err,
+			ErrUsernameAlreadyExists,
+		) {
+			return nil, ErrUsernameAlreadyExists
+		}
+
+		return nil, fmt.Errorf(
+			"update profile: %w",
+			err,
+		)
+	}
+
+	return foundUser, nil
+}
+
+func (service *Service) UpdateAvatar(
+	ctx context.Context,
+	currentUserID int64,
+	avatarPath string,
+) (*User, error) {
+	foundUser, err := service.repository.FindByID(
+		ctx,
+		currentUserID,
+	)
+	if err != nil {
+		if errors.Is(err, ErrUserNotFound) {
+			return nil, ErrUserNotFound
+		}
+
+		return nil, fmt.Errorf(
+			"find user for avatar update: %w",
+			err,
+		)
+	}
+
+	err = service.repository.UpdateAvatarPath(
+		ctx,
+		currentUserID,
+		avatarPath,
+	)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"update avatar: %w",
+			err,
+		)
+	}
+
+	foundUser.AvatarPath = avatarPath
+
+	return foundUser, nil
+}
+
+func (service *Service) GetProfile(
+	ctx context.Context,
+	currentUserID int64,
+) (*User, error) {
+	foundUser, err := service.repository.FindByID(
+		ctx,
+		currentUserID,
+	)
+	if err != nil {
+		if errors.Is(err, ErrUserNotFound) {
+			return nil, ErrUserNotFound
+		}
+
+		return nil, fmt.Errorf(
+			"get user profile: %w",
+			err,
+		)
+	}
+
+	return foundUser, nil
 }

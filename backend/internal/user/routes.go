@@ -11,20 +11,41 @@ func RegisterRoutes(
 	handler *Handler,
 	authMiddleware *auth.Middleware,
 ) {
-	mux.HandleFunc("/api/v1/auth/register", handler.Register)
-	mux.HandleFunc("/api/v1/auth/login", handler.Login)
+	mux.HandleFunc(
+		"POST /api/v1/auth/register",
+		handler.Register,
+	)
+
+	mux.HandleFunc(
+		"POST /api/v1/auth/login",
+		handler.Login,
+	)
 
 	mux.Handle(
-		"/api/v1/me",
+		"GET /api/v1/me",
 		authMiddleware.Authenticate(
 			http.HandlerFunc(handler.Me),
 		),
 	)
 
 	mux.Handle(
-		"/api/v1/users/search",
+		"PUT /api/v1/me/profile",
+		authMiddleware.Authenticate(
+			http.HandlerFunc(handler.UpdateProfile),
+		),
+	)
+
+	mux.Handle(
+		"GET /api/v1/users/search",
 		authMiddleware.Authenticate(
 			http.HandlerFunc(handler.Search),
+		),
+	)
+
+	mux.Handle(
+		"POST /api/v1/me/avatar",
+		authMiddleware.Authenticate(
+			http.HandlerFunc(handler.UploadAvatar),
 		),
 	)
 }

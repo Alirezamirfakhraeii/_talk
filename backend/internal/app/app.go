@@ -15,11 +15,14 @@ import (
 	"github.com/ALirezamirfakhraeii/samatalk/backend/internal/user"
 
 	"github.com/ALirezamirfakhraeii/samatalk/backend/internal/auth"
+	"github.com/ALirezamirfakhraeii/samatalk/backend/internal/message"
+	"github.com/ALirezamirfakhraeii/samatalk/backend/internal/realtime"
 )
 
 type App struct {
-	server   *httpserver.Server
-	database *pgxpool.Pool
+	server      *httpserver.Server
+	database    *pgxpool.Pool
+	realtimeHub *realtime.Hub
 }
 
 func New(
@@ -36,8 +39,17 @@ func New(
 			err,
 		)
 	}
-
 	mux := http.NewServeMux()
+
+	mux.Handle(
+		"GET /uploads/",
+		http.StripPrefix(
+			"/uploads/",
+			http.FileServer(
+				http.Dir("./uploads"),
+			),
+		),
+	)
 
 	healthHandler := health.NewHandler(
 		databasePool,
@@ -58,6 +70,16 @@ func New(
 
 	authMiddleware := auth.NewMiddleware(authRepository)
 
+	realtimeHub := realtime.NewHub()
+
+	realtimeHandler := realtime.NewHandler(realtimeHub)
+
+	realtime.RegisterRoutes(
+		mux,
+		realtimeHandler,
+		authMiddleware,
+	)
+
 	userService := user.NewService(
 		userRepository,
 		authRepository,
@@ -69,6 +91,7 @@ func New(
 
 	conversationService := conversation.NewService(
 		conversationRepository,
+		userRepository,
 	)
 
 	conversationHandler := conversation.NewHandler(
@@ -78,6 +101,24 @@ func New(
 	conversation.RegisterRoutes(
 		mux,
 		conversationHandler,
+		authMiddleware,
+	)
+
+	messageRepository := message.NewRepository(databasePool)
+
+	messageService := message.NewService(
+		messageRepository,
+		conversationRepository,
+	)
+
+	messageHandler := message.NewHandler(
+		messageService,
+		realtimeHub,
+	)
+
+	message.RegisterRoutes(
+		mux,
+		messageHandler,
 		authMiddleware,
 	)
 
@@ -93,12 +134,14 @@ func New(
 	)
 
 	return &App{
-		server:   server,
-		database: databasePool,
+		server:      server,
+		database:    databasePool,
+		realtimeHub: realtimeHub,
 	}, nil
 }
 
 func (app *App) Run(ctx context.Context) error {
+	go app.realtimeHub.Run(ctx)
 	return app.server.Run(ctx)
 }
 
