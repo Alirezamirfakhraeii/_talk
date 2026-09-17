@@ -335,8 +335,8 @@ function ChatsPage() {
             {
                 id: conversation.user_id,
                 name: conversation.name,
-                username:
-                conversation.username,
+                username: conversation.username,
+                avatar_path: conversation.avatar_path,
             },
         )
     }
@@ -531,8 +531,20 @@ function ChatsPage() {
                                 >
                                     <div className="avatar-wrapper">
                                         <div className="avatar">
-                                            {getInitials(
-                                                conversation.name,
+                                            {conversation.avatar_path ? (
+                                                <img
+                                                    src={
+                                                        conversation.avatar_path
+                                                    }
+                                                    alt={
+                                                        conversation.name
+                                                    }
+                                                    className="chat-avatar-image"
+                                                />
+                                            ) : (
+                                                getInitials(
+                                                    conversation.name,
+                                                )
                                             )}
                                         </div>
                                     </div>
@@ -568,13 +580,19 @@ function ChatsPage() {
                     <div className="avatar avatar-current">
                         {currentProfile?.avatar_path ? (
                             <img
-                                src={currentProfile.avatar_path}
-                                alt={currentProfile.name}
+                                src={
+                                    currentProfile.avatar_path
+                                }
+                                alt={
+                                    currentProfile.name
+                                }
                                 className="sidebar-profile-avatar-image"
                             />
                         ) : (
                             currentProfile
-                                ? getInitials(currentProfile.name)
+                                ? getInitials(
+                                    currentProfile.name,
+                                )
                                 : '?'
                         )}
                     </div>
@@ -613,11 +631,23 @@ function ChatsPage() {
                     <div className="conversation-user">
                         <div className="avatar-wrapper">
                             <div className="avatar">
-                                {activeUser
-                                    ? getInitials(
+                                {activeUser?.avatar_path ? (
+                                    <img
+                                        src={
+                                            activeUser.avatar_path
+                                        }
+                                        alt={
+                                            activeUser.name
+                                        }
+                                        className="chat-avatar-image"
+                                    />
+                                ) : activeUser ? (
+                                    getInitials(
                                         activeUser.name,
                                     )
-                                    : '?'}
+                                ) : (
+                                    '?'
+                                )}
                             </div>
                         </div>
 
@@ -735,11 +765,23 @@ function ChatsPage() {
                                     >
                                         {isReceived && (
                                             <div className="avatar message-avatar">
-                                                {activeUser
-                                                    ? getInitials(
+                                                {activeUser?.avatar_path ? (
+                                                    <img
+                                                        src={
+                                                            activeUser.avatar_path
+                                                        }
+                                                        alt={
+                                                            activeUser.name
+                                                        }
+                                                        className="chat-avatar-image"
+                                                    />
+                                                ) : activeUser ? (
+                                                    getInitials(
                                                         activeUser.name,
                                                     )
-                                                    : '?'}
+                                                ) : (
+                                                    '?'
+                                                )}
                                             </div>
                                         )}
 

@@ -29,6 +29,7 @@ type conversationSummaryResponseData struct {
 	UserID          int64      `json:"user_id"`
 	Name            string     `json:"name"`
 	Username        string     `json:"username"`
+	AvatarPath      string     `json:"avatar_path"`
 	LastMessage     *string    `json:"last_message"`
 	LastMessageTime *time.Time `json:"last_message_time"`
 }
@@ -169,6 +170,7 @@ func (handler *Handler) List(
 			UserID:          conversation.UserID,
 			Name:            conversation.Name,
 			Username:        conversation.Username,
+			AvatarPath:      conversation.AvatarPath,
 			LastMessage:     conversation.LastMessage,
 			LastMessageTime: conversation.LastMessageTime,
 		})

@@ -15,6 +15,7 @@ type ConversationSummary struct {
 	UserID          int64
 	Name            string
 	Username        string
+	AvatarPath      string
 	LastMessage     *string
 	LastMessageTime *time.Time
 }

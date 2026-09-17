@@ -75,6 +75,15 @@ function UserSearch({onConversationStarted}: UserSearchProps) {
         }
     }
 
+    function getInitials(name: string) {
+        return name
+            .split(' ')
+            .map((part) => part.charAt(0))
+            .join('')
+            .slice(0, 2)
+            .toUpperCase()
+    }
+
     return (
         <div className="user-search">
             <div className="sidebar-search">
@@ -118,7 +127,15 @@ function UserSearch({onConversationStarted}: UserSearchProps) {
                                 onClick={() => handleSelectUser(user)}
                             >
                                 <div className="avatar">
-                                    {user.name.slice(0, 2).toUpperCase()}
+                                    {user.avatar_path ? (
+                                        <img
+                                            src={user.avatar_path}
+                                            alt={user.name}
+                                            className="chat-avatar-image"
+                                        />
+                                    ) : (
+                                        getInitials(user.name)
+                                    )}
                                 </div>
 
                                 <div className="conversation-content">

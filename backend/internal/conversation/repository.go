@@ -116,41 +116,56 @@ func (repository *Repository) ListForUser(
 ) ([]ConversationSummary, error) {
 	query := `
 		SELECT
-			dc.id,
+			conversation.id,
 			other_user.id,
 			other_user.name,
 			other_user.username,
+			COALESCE(other_user.avatar_path, ''),
 			last_message.content,
 			last_message.created_at
-		FROM direct_conversations dc
-		JOIN users other_user
+		FROM direct_conversations AS conversation
+		JOIN users AS other_user
 			ON other_user.id = CASE
-				WHEN dc.user_one_id = $1 THEN dc.user_two_id
-				ELSE dc.user_one_id
+				WHEN conversation.user_one_id = $1
+					THEN conversation.user_two_id
+				ELSE conversation.user_one_id
 			END
 		LEFT JOIN LATERAL (
 			SELECT
-				m.content,
-				m.created_at
-			FROM messages m
-			WHERE m.conversation_id = dc.id
-			ORDER BY m.id DESC
+				message.content,
+				message.created_at
+			FROM messages AS message
+			WHERE message.conversation_id = conversation.id
+			ORDER BY message.id DESC
 			LIMIT 1
-		) last_message ON TRUE
-		WHERE dc.user_one_id = $1
-		   OR dc.user_two_id = $1
+		) AS last_message ON TRUE
+		WHERE
+			conversation.user_one_id = $1
+			OR conversation.user_two_id = $1
 		ORDER BY
-			COALESCE(last_message.created_at, dc.created_at) DESC,
-			dc.id DESC
+			COALESCE(
+				last_message.created_at,
+				conversation.updated_at
+			) DESC
 	`
 
-	rows, err := repository.database.Query(ctx, query, userID)
+	rows, err := repository.database.Query(
+		ctx,
+		query,
+		userID,
+	)
 	if err != nil {
-		return nil, fmt.Errorf("list user conversations: %w", err)
+		return nil, fmt.Errorf(
+			"list conversations: %w",
+			err,
+		)
 	}
 	defer rows.Close()
 
-	conversations := make([]ConversationSummary, 0)
+	conversations := make(
+		[]ConversationSummary,
+		0,
+	)
 
 	for rows.Next() {
 		var summary ConversationSummary
@@ -162,28 +177,38 @@ func (repository *Repository) ListForUser(
 			&summary.UserID,
 			&summary.Name,
 			&summary.Username,
+			&summary.AvatarPath,
 			&lastMessage,
 			&lastMessageTime,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("scan conversation summary: %w", err)
+			return nil, fmt.Errorf(
+				"scan conversation summary: %w",
+				err,
+			)
 		}
 
 		if lastMessage.Valid {
-			value := lastMessage.String
-			summary.LastMessage = &value
+			summary.LastMessage =
+				&lastMessage.String
 		}
 
 		if lastMessageTime.Valid {
-			value := lastMessageTime.Time
-			summary.LastMessageTime = &value
+			summary.LastMessageTime =
+				&lastMessageTime.Time
 		}
 
-		conversations = append(conversations, summary)
+		conversations = append(
+			conversations,
+			summary,
+		)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate conversations: %w", err)
+		return nil, fmt.Errorf(
+			"iterate conversations: %w",
+			err,
+		)
 	}
 
 	return conversations, nil

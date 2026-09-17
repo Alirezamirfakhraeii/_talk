@@ -11,10 +11,10 @@ export type ConversationSummary = {
     user_id: number
     name: string
     username: string
+    avatar_path: string
     last_message: string | null
     last_message_time: string | null
 }
-
 type StartConversationRequest = {
     user_id: number
 }

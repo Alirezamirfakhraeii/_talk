@@ -71,9 +71,10 @@ type loginResponseData struct {
 }
 
 type searchUserResponseData struct {
-	ID       int64  `json:"id"`
-	Name     string `json:"name"`
-	Username string `json:"username"`
+	ID         int64  `json:"id"`
+	Name       string `json:"name"`
+	Username   string `json:"username"`
+	AvatarPath string `json:"avatar_path"`
 }
 
 type profileResponseData struct {
@@ -356,9 +357,10 @@ func (handler *Handler) Search(
 		results = append(
 			results,
 			searchUserResponseData{
-				ID:       foundUser.ID,
-				Name:     foundUser.Name,
-				Username: foundUser.Username,
+				ID:         foundUser.ID,
+				Name:       foundUser.Name,
+				Username:   foundUser.Username,
+				AvatarPath: foundUser.AvatarPath,
 			},
 		)
 	}

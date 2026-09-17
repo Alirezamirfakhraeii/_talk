@@ -173,7 +173,8 @@ func (repository *Repository) Search(
 		SELECT
 			id,
 			name,
-			username
+			username,
+			COALESCE(avatar_path, '')
 		FROM users
 		WHERE id <> $1
 		  AND (
@@ -209,6 +210,7 @@ func (repository *Repository) Search(
 			&foundUser.ID,
 			&foundUser.Name,
 			&foundUser.Username,
+			&foundUser.AvatarPath,
 		)
 		if err != nil {
 			return nil, fmt.Errorf(
